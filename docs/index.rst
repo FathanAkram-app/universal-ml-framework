@@ -1,35 +1,37 @@
-Universal ML Framework Documentation
-====================================
+🌟 Universal ML Framework
+=========================
 
-Welcome to Universal ML Framework - a complete, automated machine learning pipeline framework that works with any dataset.
+.. image:: https://img.shields.io/badge/python-3.7+-blue.svg
+   :target: https://www.python.org/downloads/
+   :alt: Python 3.7+
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+.. image:: https://img.shields.io/badge/License-MIT-yellow.svg
+   :target: https://opensource.org/licenses/MIT
+   :alt: License: MIT
 
-   installation
-   quickstart
-   api
-   examples
+**A complete, automated machine learning pipeline framework that works with any dataset.**
 
-Overview
---------
+Build, compare, and deploy ML models with minimal code.
 
-Universal ML Framework is designed to automate the entire machine learning workflow:
+🚀 Key Features
+---------------
 
-* **Auto Feature Detection** - Automatically identifies numeric, categorical, and binary features
-* **Model Comparison** - Tests multiple algorithms with cross-validation
-* **Hyperparameter Tuning** - Optimizes the best performing model
-* **Production Ready** - Saves trained models and generates predictions
+* 🤖 **Automated Pipeline** - Complete ML workflow from data to deployment
+* 🔍 **Auto Feature Detection** - Automatically identifies numeric, categorical, and binary features  
+* 📊 **Model Comparison** - Tests multiple algorithms with cross-validation
+* ⚙️ **Hyperparameter Tuning** - Automatic parameter optimization
+* 🎯 **Multi-Problem Support** - Classification and regression tasks
+* 📦 **Production Ready** - Model persistence and metadata tracking
 
-Supported Problems
-------------------
+📦 Quick Install
+----------------
 
-* **Classification** - Binary and multi-class classification
-* **Regression** - Continuous target prediction
+.. code-block:: bash
 
-Quick Example
--------------
+   pip install universal-ml-framework
+
+🎯 Quick Start
+--------------
 
 .. code-block:: python
 
@@ -43,9 +45,53 @@ Quick Example
        test_path='test.csv'
    )
 
-Indices and tables
-==================
+   print(f"Best model: {pipeline.best_model_name}")
+   print(f"Best score: {pipeline.best_score:.4f}")
 
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+📚 Documentation
+----------------
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
+
+   installation
+   quickstart
+   api
+   examples
+
+🔧 Supported Algorithms
+-----------------------
+
+**Classification:**
+
+* Random Forest Classifier
+* Logistic Regression  
+* Support Vector Machine
+
+**Regression:**
+
+* Random Forest Regressor
+* Linear Regression
+* Support Vector Regression
+
+📈 What It Does
+---------------
+
+1. **Data Loading** - Reads CSV files automatically
+2. **Feature Detection** - Identifies feature types (numeric/categorical/binary)
+3. **Preprocessing** - Handles missing values, encoding, scaling
+4. **Model Training** - Trains multiple algorithms with cross-validation
+5. **Hyperparameter Tuning** - Optimizes best performing model
+6. **Prediction** - Generates predictions on test data
+7. **Model Saving** - Persists trained model and metadata
+
+🎯 Use Cases
+------------
+
+* **Business Analytics** - Customer churn, sales forecasting
+* **Finance** - Credit risk, fraud detection
+* **Healthcare** - Medical diagnosis, treatment prediction
+* **Marketing** - Campaign response, customer segmentation
+* **Real Estate** - Price prediction, market analysis
+* **HR** - Employee performance, retention prediction
