@@ -9,6 +9,12 @@ extensions = [
     'myst_parser'
 ]
 
+import sys
+import os
+sys.path.insert(0, os.path.abspath('..'))
+
+autodoc_mock_imports = ['pandas', 'numpy', 'sklearn', 'joblib']
+
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
