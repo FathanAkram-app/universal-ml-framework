@@ -28,12 +28,13 @@ warnings.filterwarnings('ignore')
 class UniversalMLPipeline:
     """Universal ML Pipeline untuk Classification dan Regression"""
     
-    def __init__(self, problem_type='classification', random_state=42, verbose=False, fast_mode=False, tuning_method='random'):
+    def __init__(self, problem_type='classification', random_state=42, verbose=False, fast_mode=False, tuning_method='random', n_jobs=-1):
         self.problem_type = problem_type
         self.random_state = random_state
         self.verbose = verbose
         self.fast_mode = fast_mode
         self.tuning_method = tuning_method  # 'grid', 'random', 'bayesian'
+        self.n_jobs = n_jobs  # -1 for all cores, 1 for single core
         self.preprocessor = None
         self.models = {}
         self.best_pipeline = None
@@ -163,34 +164,34 @@ class UniversalMLPipeline:
             # Fast models for large datasets
             if self.problem_type == 'classification':
                 self.models = {
-                    'RandomForest': RandomForestClassifier(random_state=self.random_state, n_estimators=50),
-                    'LogisticRegression': LogisticRegression(random_state=self.random_state, max_iter=500),
+                    'RandomForest': RandomForestClassifier(random_state=self.random_state, n_estimators=50, n_jobs=self.n_jobs),
+                    'LogisticRegression': LogisticRegression(random_state=self.random_state, max_iter=500, n_jobs=self.n_jobs),
                     'NaiveBayes': GaussianNB()
                 }
             else:
                 self.models = {
-                    'RandomForest': RandomForestRegressor(random_state=self.random_state, n_estimators=50),
-                    'LinearRegression': LinearRegression()
+                    'RandomForest': RandomForestRegressor(random_state=self.random_state, n_estimators=50, n_jobs=self.n_jobs),
+                    'LinearRegression': LinearRegression(n_jobs=self.n_jobs)
                 }
         else:
             # Full model set
             if self.problem_type == 'classification':
                 self.models = {
-                    'RandomForest': RandomForestClassifier(random_state=self.random_state),
+                    'RandomForest': RandomForestClassifier(random_state=self.random_state, n_jobs=self.n_jobs),
                     'GradientBoosting': GradientBoostingClassifier(random_state=self.random_state),
-                    'LogisticRegression': LogisticRegression(random_state=self.random_state, max_iter=1000),
+                    'LogisticRegression': LogisticRegression(random_state=self.random_state, max_iter=1000, n_jobs=self.n_jobs),
                     'SVM': SVC(random_state=self.random_state, probability=True),
                     'NaiveBayes': GaussianNB(),
-                    'KNN': KNeighborsClassifier(),
+                    'KNN': KNeighborsClassifier(n_jobs=self.n_jobs),
                     'DecisionTree': DecisionTreeClassifier(random_state=self.random_state)
                 }
             else:
                 self.models = {
-                    'RandomForest': RandomForestRegressor(random_state=self.random_state),
+                    'RandomForest': RandomForestRegressor(random_state=self.random_state, n_jobs=self.n_jobs),
                     'GradientBoosting': GradientBoostingRegressor(random_state=self.random_state),
-                    'LinearRegression': LinearRegression(),
+                    'LinearRegression': LinearRegression(n_jobs=self.n_jobs),
                     'SVM': SVR(),
-                    'KNN': KNeighborsRegressor(),
+                    'KNN': KNeighborsRegressor(n_jobs=self.n_jobs),
                     'DecisionTree': DecisionTreeRegressor(random_state=self.random_state)
                 }
         
@@ -218,7 +219,7 @@ class UniversalMLPipeline:
             if self.verbose:
                 print(f"\n[{i}/{len(self.models)}] 🔄 Training {model_name}...")
             
-            cv_scores = cross_val_score(pipeline, self.X, self.y, cv=cv, scoring=scoring)
+            cv_scores = cross_val_score(pipeline, self.X, self.y, cv=cv, scoring=scoring, n_jobs=self.n_jobs)
             
             if self.problem_type == 'regression':
                 cv_scores = -cv_scores
@@ -266,7 +267,7 @@ class UniversalMLPipeline:
                     param_grid,
                     cv=cv,
                     scoring=scoring,
-                    n_jobs=-1,
+                    n_jobs=self.n_jobs,
                     n_iter=20 if self.fast_mode else 50,
                     random_state=self.random_state
                 )
@@ -276,7 +277,7 @@ class UniversalMLPipeline:
                     param_grid,
                     cv=cv,
                     scoring=scoring,
-                    n_jobs=-1,
+                    n_jobs=self.n_jobs,
                     verbose=1 if self.verbose else 0
                 )
             else:  # random (default)
@@ -285,7 +286,7 @@ class UniversalMLPipeline:
                     param_grid,
                     cv=cv,
                     scoring=scoring,
-                    n_jobs=-1,
+                    n_jobs=self.n_jobs,
                     n_iter=20 if self.fast_mode else 50,
                     random_state=self.random_state,
                     verbose=1 if self.verbose else 0
@@ -424,7 +425,7 @@ class UniversalMLPipeline:
     
     def run_pipeline(self, train_path, target_column, test_path=None, 
                     problem_type='classification', exclude_columns=None, 
-                    custom_features=None, feature_engineering_func=None, verbose=None, fast_mode=None, tuning_method=None):
+                    custom_features=None, feature_engineering_func=None, verbose=None, fast_mode=None, tuning_method=None, n_jobs=None):
         """Run complete pipeline"""
         print("🚀 STARTING UNIVERSAL ML PIPELINE")
         print("=" * 60)
@@ -436,6 +437,8 @@ class UniversalMLPipeline:
             self.fast_mode = fast_mode
         if tuning_method is not None:
             self.tuning_method = tuning_method
+        if n_jobs is not None:
+            self.n_jobs = n_jobs
         
         self.load_data(train_path, test_path, target_column)
         

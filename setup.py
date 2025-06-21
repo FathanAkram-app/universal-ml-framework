@@ -8,7 +8,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="universal-ml-framework",
-    version="1.0.1",
+    version="1.2.0",
     author="Fathan Akram",
     author_email="fathan.a.dev@gmail.com",
     description="A complete machine learning pipeline framework for any dataset",

@@ -1,7 +1,7 @@
 # Universal ML Framework
 # A complete machine learning pipeline framework for any dataset
 
-__version__ = "1.0.0"
+__version__ = "1.2.0"
 __author__ = "Fathan Akram"
 
 from .core.pipeline import UniversalMLPipeline
