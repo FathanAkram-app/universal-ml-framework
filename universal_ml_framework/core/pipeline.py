@@ -313,7 +313,8 @@ class UniversalMLPipeline:
         print("✅ Model info saved as model_info.json")
     
     def run_pipeline(self, train_path, target_column, test_path=None, 
-                    problem_type='classification', exclude_columns=None, custom_features=None):
+                    problem_type='classification', exclude_columns=None, 
+                    custom_features=None, feature_engineering_func=None):
         """Run complete pipeline"""
         print("🚀 STARTING UNIVERSAL ML PIPELINE")
         print("=" * 60)
@@ -321,6 +322,13 @@ class UniversalMLPipeline:
         self.problem_type = problem_type
         
         self.load_data(train_path, test_path, target_column)
+        
+        if feature_engineering_func:
+            print("🛠️ Applying feature engineering...")
+            self.train_df = feature_engineering_func(self.train_df)
+            if self.test_df is not None:
+                self.test_df = feature_engineering_func(self.test_df)
+            print("✅ Feature engineering complete.")
         
         exclude_cols = [target_column] + (exclude_columns or [])
         self.auto_detect_features(self.train_df, exclude_cols)
