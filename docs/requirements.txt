@@ -1,6 +1,5 @@
 sphinx>=4.0
 sphinx-rtd-theme
-myst-parser
 pandas>=1.3.0
 scikit-learn>=1.0.0
 numpy>=1.21.0

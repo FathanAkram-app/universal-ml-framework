@@ -5,8 +5,7 @@ release = '1.0.1'
 
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinx.ext.viewcode',
-    'myst_parser'
+    'sphinx.ext.viewcode'
 ]
 
 import sys
@@ -23,5 +22,5 @@ html_static_path = ['_static']
 
 source_suffix = {
     '.rst': None,
-    '.md': 'myst_parser',
+    '.md': None,
 }
