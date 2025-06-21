@@ -4,13 +4,21 @@
 import pandas as pd
 import numpy as np
 from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
+from sklearn.compose import ColumnTransformer # Keep this import
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.impute import SimpleImputer
-from sklearn.model_selection import cross_val_score, GridSearchCV, StratifiedKFold, KFold
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.model_selection import cross_val_score, GridSearchCV, RandomizedSearchCV, StratifiedKFold, KFold
+try:
+    from skopt import BayesSearchCV
+    BAYESIAN_AVAILABLE = True
+except ImportError:
+    BAYESIAN_AVAILABLE = False
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier, GradientBoostingRegressor
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.svm import SVC, SVR
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.metrics import classification_report, mean_squared_error, r2_score
 import joblib
 import json
@@ -20,9 +28,12 @@ warnings.filterwarnings('ignore')
 class UniversalMLPipeline:
     """Universal ML Pipeline untuk Classification dan Regression"""
     
-    def __init__(self, problem_type='classification', random_state=42):
+    def __init__(self, problem_type='classification', random_state=42, verbose=False, fast_mode=False, tuning_method='random'):
         self.problem_type = problem_type
         self.random_state = random_state
+        self.verbose = verbose
+        self.fast_mode = fast_mode
+        self.tuning_method = tuning_method  # 'grid', 'random', 'bayesian'
         self.preprocessor = None
         self.models = {}
         self.best_pipeline = None
@@ -34,6 +45,7 @@ class UniversalMLPipeline:
         print(f"📂 Loading data...")
         
         self.train_df = pd.read_csv(train_path)
+        self.train_df_full = self.train_df.copy()
         if test_path:
             self.test_df = pd.read_csv(test_path)
         else:
@@ -147,18 +159,40 @@ class UniversalMLPipeline:
         """Define models based on problem type"""
         print("🤖 Defining models...")
         
-        if self.problem_type == 'classification':
-            self.models = {
-                'RandomForest': RandomForestClassifier(random_state=self.random_state),
-                'LogisticRegression': LogisticRegression(random_state=self.random_state, max_iter=1000),
-                'SVM': SVC(random_state=self.random_state, probability=True)
-            }
+        if self.fast_mode:
+            # Fast models for large datasets
+            if self.problem_type == 'classification':
+                self.models = {
+                    'RandomForest': RandomForestClassifier(random_state=self.random_state, n_estimators=50),
+                    'LogisticRegression': LogisticRegression(random_state=self.random_state, max_iter=500),
+                    'NaiveBayes': GaussianNB()
+                }
+            else:
+                self.models = {
+                    'RandomForest': RandomForestRegressor(random_state=self.random_state, n_estimators=50),
+                    'LinearRegression': LinearRegression()
+                }
         else:
-            self.models = {
-                'RandomForest': RandomForestRegressor(random_state=self.random_state),
-                'LinearRegression': LinearRegression(),
-                'SVM': SVR()
-            }
+            # Full model set
+            if self.problem_type == 'classification':
+                self.models = {
+                    'RandomForest': RandomForestClassifier(random_state=self.random_state),
+                    'GradientBoosting': GradientBoostingClassifier(random_state=self.random_state),
+                    'LogisticRegression': LogisticRegression(random_state=self.random_state, max_iter=1000),
+                    'SVM': SVC(random_state=self.random_state, probability=True),
+                    'NaiveBayes': GaussianNB(),
+                    'KNN': KNeighborsClassifier(),
+                    'DecisionTree': DecisionTreeClassifier(random_state=self.random_state)
+                }
+            else:
+                self.models = {
+                    'RandomForest': RandomForestRegressor(random_state=self.random_state),
+                    'GradientBoosting': GradientBoostingRegressor(random_state=self.random_state),
+                    'LinearRegression': LinearRegression(),
+                    'SVM': SVR(),
+                    'KNN': KNeighborsRegressor(),
+                    'DecisionTree': DecisionTreeRegressor(random_state=self.random_state)
+                }
         
         print(f"✅ Models: {list(self.models.keys())}")
     
@@ -167,17 +201,22 @@ class UniversalMLPipeline:
         print("📊 Cross validating models...")
         
         if self.problem_type == 'classification':
-            cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=self.random_state)
+            cv_splits = 3 if self.fast_mode else 5
+            cv = StratifiedKFold(n_splits=cv_splits, shuffle=True, random_state=self.random_state)
             scoring = 'accuracy'
         else:
-            cv = KFold(n_splits=5, shuffle=True, random_state=self.random_state)
+            cv_splits = 3 if self.fast_mode else 5
+            cv = KFold(n_splits=cv_splits, shuffle=True, random_state=self.random_state)
             scoring = 'neg_mean_squared_error'
         
-        for model_name, model in self.models.items():
+        for i, (model_name, model) in enumerate(self.models.items(), 1):
             pipeline = Pipeline([
                 ('preprocessor', self.preprocessor),
                 ('model', model)
             ])
+            
+            if self.verbose:
+                print(f"\n[{i}/{len(self.models)}] 🔄 Training {model_name}...")
             
             cv_scores = cross_val_score(pipeline, self.X, self.y, cv=cv, scoring=scoring)
             
@@ -192,7 +231,13 @@ class UniversalMLPipeline:
             }
             
             metric_name = 'Accuracy' if self.problem_type == 'classification' else 'MSE'
-            print(f"{model_name:18}: {cv_scores.mean():.4f} (±{cv_scores.std():.4f}) {metric_name}")
+            
+            if self.verbose:
+                for j, score in enumerate(cv_scores, 1):
+                    print(f"  Fold {j}/{cv_splits}: {score:.4f}")
+                print(f"  ✅ {model_name} completed - Mean: {cv_scores.mean():.4f} (±{cv_scores.std():.4f})")
+            else:
+                print(f"{model_name:18}: {cv_scores.mean():.4f} (±{cv_scores.std():.4f}) {metric_name}")
         
         if self.problem_type == 'classification':
             self.best_model_name = max(self.cv_results.keys(), key=lambda x: self.cv_results[x]['mean'])
@@ -206,26 +251,51 @@ class UniversalMLPipeline:
         print(f"🎯 Hyperparameter tuning for {self.best_model_name}...")
         
         param_grids = self._get_param_grids()
-        best_pipeline = self.cv_results[self.best_model_name]['pipeline']
+        best_pipeline = self.cv_results[self.best_model_name]['pipeline'] # Get the pipeline from CV results
         param_grid = param_grids.get(self.best_model_name, {})
         
         if param_grid:
-            cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=self.random_state) if self.problem_type == 'classification' else KFold(n_splits=5, shuffle=True, random_state=self.random_state)
+            cv_splits = 3 if self.fast_mode else 5
+            cv = StratifiedKFold(n_splits=cv_splits, shuffle=True, random_state=self.random_state) if self.problem_type == 'classification' else KFold(n_splits=cv_splits, shuffle=True, random_state=self.random_state)
             scoring = 'accuracy' if self.problem_type == 'classification' else 'neg_mean_squared_error'
             
-            grid_search = GridSearchCV(
-                best_pipeline,
-                param_grid,
-                cv=cv,
-                scoring=scoring,
-                n_jobs=-1
-            )
+            # Choose tuning method
+            if self.tuning_method == 'bayesian' and BAYESIAN_AVAILABLE:
+                grid_search = BayesSearchCV(
+                    best_pipeline,
+                    param_grid,
+                    cv=cv,
+                    scoring=scoring,
+                    n_jobs=-1,
+                    n_iter=20 if self.fast_mode else 50,
+                    random_state=self.random_state
+                )
+            elif self.tuning_method == 'grid':
+                grid_search = GridSearchCV(
+                    best_pipeline,
+                    param_grid,
+                    cv=cv,
+                    scoring=scoring,
+                    n_jobs=-1,
+                    verbose=1 if self.verbose else 0
+                )
+            else:  # random (default)
+                grid_search = RandomizedSearchCV(
+                    best_pipeline,
+                    param_grid,
+                    cv=cv,
+                    scoring=scoring,
+                    n_jobs=-1,
+                    n_iter=20 if self.fast_mode else 50,
+                    random_state=self.random_state,
+                    verbose=1 if self.verbose else 0
+                )
             
             grid_search.fit(self.X, self.y)
             
             self.best_pipeline = grid_search.best_estimator_
             self.best_params = grid_search.best_params_
-            self.best_score = grid_search.best_score_
+            self.best_score = abs(grid_search.best_score_) if self.problem_type == 'regression' else grid_search.best_score_
             
             print(f"✅ Best parameters: {self.best_params}")
             print(f"✅ Best CV score: {self.best_score:.4f}")
@@ -239,30 +309,64 @@ class UniversalMLPipeline:
         if self.problem_type == 'classification':
             return {
                 'RandomForest': {
-                    'model__n_estimators': [100, 200],
-                    'model__max_depth': [5, 10, None],
-                    'model__min_samples_split': [2, 5]
+                    'model__n_estimators': [50, 100, 200, 300],
+                    'model__max_depth': [3, 5, 10, 15, None],
+                    'model__min_samples_split': [2, 5, 10],
+                    'model__min_samples_leaf': [1, 2, 4]
+                },
+                'GradientBoosting': {
+                    'model__n_estimators': [50, 100, 200],
+                    'model__learning_rate': [0.01, 0.1, 0.2, 0.3],
+                    'model__max_depth': [3, 5, 7]
                 },
                 'LogisticRegression': {
-                    'model__C': [0.1, 1, 10],
+                    'model__C': [0.01, 0.1, 1, 10, 100],
                     'model__penalty': ['l1', 'l2'],
-                    'model__solver': ['liblinear']
+                    'model__solver': ['liblinear', 'saga']
                 },
                 'SVM': {
-                    'model__C': [0.1, 1, 10],
-                    'model__kernel': ['rbf', 'linear']
+                    'model__C': [0.1, 1, 10, 100],
+                    'model__kernel': ['rbf', 'linear'],
+                    'model__gamma': ['scale', 'auto', 0.001, 0.01]
+                },
+                'KNN': {
+                    'model__n_neighbors': [3, 5, 7, 9, 11],
+                    'model__weights': ['uniform', 'distance'],
+                    'model__metric': ['euclidean', 'manhattan']
+                },
+                'DecisionTree': {
+                    'model__max_depth': [3, 5, 10, 15, None],
+                    'model__min_samples_split': [2, 5, 10],
+                    'model__min_samples_leaf': [1, 2, 4]
                 }
             }
         else:
             return {
                 'RandomForest': {
-                    'model__n_estimators': [100, 200],
-                    'model__max_depth': [5, 10, None]
+                    'model__n_estimators': [50, 100, 200, 300],
+                    'model__max_depth': [3, 5, 10, 15, None],
+                    'model__min_samples_split': [2, 5, 10],
+                    'model__min_samples_leaf': [1, 2, 4]
                 },
-                'LinearRegression': {},
+                'GradientBoosting': {
+                    'model__n_estimators': [50, 100, 200],
+                    'model__learning_rate': [0.01, 0.1, 0.2, 0.3],
+                    'model__max_depth': [3, 5, 7]
+                },
                 'SVM': {
-                    'model__C': [0.1, 1, 10],
-                    'model__kernel': ['rbf', 'linear']
+                    'model__C': [0.1, 1, 10, 100],
+                    'model__kernel': ['rbf', 'linear'],
+                    'model__gamma': ['scale', 'auto', 0.001, 0.01]
+                },
+                'KNN': {
+                    'model__n_neighbors': [3, 5, 7, 9, 11],
+                    'model__weights': ['uniform', 'distance'],
+                    'model__metric': ['euclidean', 'manhattan']
+                },
+                'DecisionTree': {
+                    'model__max_depth': [3, 5, 10, 15, None],
+                    'model__min_samples_split': [2, 5, 10],
+                    'model__min_samples_leaf': [1, 2, 4]
                 }
             }
     
@@ -276,8 +380,14 @@ class UniversalMLPipeline:
         
         predictions = self.best_pipeline.predict(self.X_test)
         
+        # Use original test data index or create sequential IDs
+        if hasattr(self.test_df, 'index'):
+            test_ids = self.test_df.index.tolist()
+        else:
+            test_ids = range(len(predictions))
+            
         submission = pd.DataFrame({
-            'ID': range(len(predictions)),
+            'ID': test_ids,
             'Prediction': predictions
         })
         
@@ -302,7 +412,7 @@ class UniversalMLPipeline:
             'problem_type': self.problem_type,
             'best_model': self.best_model_name,
             'best_params': getattr(self, 'best_params', {}),
-            'cv_score': getattr(self, 'best_score', self.cv_results[self.best_model_name]['mean']),
+            'cv_score': getattr(self, 'best_score', abs(self.cv_results[self.best_model_name]['mean']) if self.problem_type == 'regression' else self.cv_results[self.best_model_name]['mean']),
             'feature_types': self.feature_types
         }
         
@@ -314,21 +424,29 @@ class UniversalMLPipeline:
     
     def run_pipeline(self, train_path, target_column, test_path=None, 
                     problem_type='classification', exclude_columns=None, 
-                    custom_features=None, feature_engineering_func=None):
+                    custom_features=None, feature_engineering_func=None, verbose=None, fast_mode=None, tuning_method=None):
         """Run complete pipeline"""
         print("🚀 STARTING UNIVERSAL ML PIPELINE")
         print("=" * 60)
         
         self.problem_type = problem_type
+        if verbose is not None:
+            self.verbose = verbose
+        if fast_mode is not None:
+            self.fast_mode = fast_mode
+        if tuning_method is not None:
+            self.tuning_method = tuning_method
         
         self.load_data(train_path, test_path, target_column)
         
         if feature_engineering_func:
             print("🛠️ Applying feature engineering...")
-            self.train_df = feature_engineering_func(self.train_df)
+            self.train_df = feature_engineering_func(self.train_df_full.copy())
             if self.test_df is not None:
                 self.test_df = feature_engineering_func(self.test_df)
             print("✅ Feature engineering complete.")
+        else:
+            self.train_df = self.train_df_full.copy()
         
         exclude_cols = [target_column] + (exclude_columns or [])
         self.auto_detect_features(self.train_df, exclude_cols)
@@ -348,5 +466,6 @@ class UniversalMLPipeline:
         print("=" * 60)
         print(f"✅ Problem Type: {self.problem_type}")
         print(f"✅ Best Model: {self.best_model_name}")
-        print(f"✅ Best Score: {getattr(self, 'best_score', self.cv_results[self.best_model_name]['mean']):.4f}")
+        best_score_display = getattr(self, 'best_score', abs(self.cv_results[self.best_model_name]['mean']) if self.problem_type == 'regression' else self.cv_results[self.best_model_name]['mean'])
+        print(f"✅ Best Score: {best_score_display:.4f}")
         print("=" * 60)
