@@ -57,8 +57,12 @@ Build, compare, and deploy ML models with minimal code.
 
    installation
    quickstart
+   titanic_case_study
+   architecture
+   advanced
    api
    examples
+   troubleshooting
 
 🔧 Supported Algorithms
 -----------------------

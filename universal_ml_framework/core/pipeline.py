@@ -371,7 +371,7 @@ class UniversalMLPipeline:
                 }
             }
     
-    def make_predictions(self, save_predictions=True):
+    def make_predictions(self, save_predictions=True, id_column=None):
         """Make predictions on test set"""
         if self.test_df is None:
             print("⚠️ No test data available")
@@ -381,14 +381,19 @@ class UniversalMLPipeline:
         
         predictions = self.best_pipeline.predict(self.X_test)
         
-        # Use original test data index or create sequential IDs
-        if hasattr(self.test_df, 'index'):
+        # Use specified ID column, original index, or sequential IDs
+        if id_column and id_column in self.test_df.columns:
+            test_ids = self.test_df[id_column].tolist()
+            id_col_name = id_column
+        elif hasattr(self.test_df, 'index'):
             test_ids = self.test_df.index.tolist()
+            id_col_name = 'ID'
         else:
             test_ids = range(len(predictions))
+            id_col_name = 'ID'
             
         submission = pd.DataFrame({
-            'ID': test_ids,
+            id_col_name: test_ids,
             'Prediction': predictions
         })
         
@@ -425,7 +430,7 @@ class UniversalMLPipeline:
     
     def run_pipeline(self, train_path, target_column, test_path=None, 
                     problem_type='classification', exclude_columns=None, 
-                    custom_features=None, feature_engineering_func=None, verbose=None, fast_mode=None, tuning_method=None, n_jobs=None):
+                    custom_features=None, feature_engineering_func=None, verbose=None, fast_mode=None, tuning_method=None, n_jobs=None, id_column=None):
         """Run complete pipeline"""
         print("🚀 STARTING UNIVERSAL ML PIPELINE")
         print("=" * 60)
@@ -439,6 +444,8 @@ class UniversalMLPipeline:
             self.tuning_method = tuning_method
         if n_jobs is not None:
             self.n_jobs = n_jobs
+        if id_column is not None:
+            self.id_column = id_column
         
         self.load_data(train_path, test_path, target_column)
         
@@ -461,7 +468,7 @@ class UniversalMLPipeline:
         self.hyperparameter_tuning()
         
         if self.test_df is not None:
-            self.make_predictions()
+            self.make_predictions(id_column=getattr(self, 'id_column', None))
         
         self.save_model()
         
